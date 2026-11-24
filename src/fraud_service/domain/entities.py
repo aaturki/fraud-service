@@ -5,7 +5,7 @@ Rules for this file:
 - no I/O, no framework types, no ML library types
 """
 import math
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator
@@ -37,6 +37,16 @@ class Transaction(BaseModel):
     def normalise_mcc(cls, v: str) -> str:
         # Domain rule: categories are upper-snake, e.g. "GROCERY"
         return v.strip().upper().replace(" ", "_")
+
+    @field_validator("timestamp")
+    @classmethod
+    def to_utc(cls, v: datetime) -> datetime:
+        # The model learned its hours in UTC: every training row is +00:00. One instant must
+        # give one hour whatever offset the caller wrote it in, so the domain keeps UTC.
+        # A time without an offset is read as UTC (the API refuses those; see schemas.py).
+        if v.tzinfo is None or v.utcoffset() is None:
+            return v.replace(tzinfo=UTC)
+        return v.astimezone(UTC)
 
     def to_features(self) -> FeatureVector:
         """The single source of feature logic for serving.
