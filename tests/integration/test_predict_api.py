@@ -17,8 +17,9 @@ def test_predict_contract(client_factory):
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"transaction_id", "fraud_probability", "decision",
-                         "model_version", "trace_id"}     # nothing extra leaks
+                         "model_version", "trace_id", "reasons"}   # nothing extra leaks
     assert body["decision"] == "block"
+    assert body["reasons"] == []           # a constant model: no input moves its score
     assert r.headers["X-Trace-Id"] == body["trace_id"]    # tracing is contract too
     assert r.headers["X-Model-Version"] == "test-1"
 
