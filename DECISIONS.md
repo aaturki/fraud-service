@@ -79,3 +79,16 @@ The known limitation is the same one the official client has without its multipr
 each of the two uvicorn workers keeps its own numbers, and a scrape reads one of them.
 Labels use route templates and one `unmatched` series for unknown paths. This keeps
 cardinality bounded even when a scanner sends random URLs.
+
+## 8. Secrets are caught before the commit, and CI proves the catcher works
+
+A scanner that only runs in CI finds a secret after it has left the laptop. By then it is in
+a pushed commit, and step 1 of [INCIDENT.md](INCIDENT.md) applies: rotate it. So gitleaks
+also runs as a pre-commit hook, on exactly what is about to be committed, at the same release
+as the CI scan. A local hook alone is not enough, though. It can be skipped with
+`--no-verify`, never installed, or blocked by the operating system: Windows Smart App Control
+refuses the hook programs on my laptop. So three layers stay. GitHub push protection refuses
+known token formats at the push, the `secrets` job scans the whole history on every pull
+request, and the `pre-commit` job stages a freshly generated fake GitHub token and fails if
+the hook ever stops refusing it. I weighed a pre-push hook instead: it catches the secret one
+step later, when it already sits in a local commit that has to be rewritten.
