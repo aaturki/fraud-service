@@ -66,8 +66,10 @@ available outside WSL).
      ▼
     domain     Transaction, FeatureVector, decision policy: pure Python, no I/O.
 
-Imports point inward only. The contract is declared in `pyproject.toml` and enforced by
-`lint-imports` on every pull request.
+Imports point inward only. Three contracts in `pyproject.toml`, enforced by `lint-imports` on
+every pull request, keep it that way: the layers above; only the adapter may import
+scikit-learn, joblib, pandas or numpy; and the domain and the service may not import FastAPI,
+Starlette, uvicorn or structlog. mypy runs in strict mode and ruff checks 18 rule families.
 
 The model sits behind a `Model` protocol (`predict_proba`, `predict_proba_many`), so the
 service never knows it is talking to scikit-learn. Tests inject a constant fake. Moving to
@@ -209,7 +211,7 @@ model:
 - **Quality floor:** on the 5,000 labelled sample transactions, the AUC stays at 0.80 or more (0.857 today) and at least 0.10 above ranking by amount alone (0.684). The notebook trained on this sample, so this is a tripwire for a model that got worse, not a promise about new data.
 - **Policy outcome:** at the default threshold, a block is fraud at least 90% of the time (10 of 10 today), and at least 8% of frauds reach review or block (10.4% today). Most fraud is still allowed at 0.85; the test keeps that trade-off visible.
 - **Reasons:** each of the 108 alerts in the labelled sample gets at least one reason, reasons name model inputs only, and making the top reason typical lowers the score by at least 0.10 (0.115 at least today).
-- **Golden file:** all 5,000 reference rows reproduce within 1e-6. This is the skew tripwire; it is slow, so it runs nightly.
+- **Golden file:** all 5,000 reference rows reproduce within 1e-6. This is the skew tripwire. It takes about 9 s, so it stays out of the per-commit loop on a laptop, but CI replays it on every pull request (and nightly).
 
 The data checks read `data/` and never write it. The sample has the expected columns, no
 gaps, unique ids, all four channels, and UTC times with none in the future, and every row
@@ -228,8 +230,8 @@ corpus from shrinking.
 | `secrets` | PR, main | gitleaks finds no secret anywhere in the history |
 | `pre-commit` | PR, main | Every pre-commit hook passes on the whole repository, and the gitleaks hook refuses a freshly generated fake token |
 | `golden-guard` | PR, main | A golden file never changes without a `docs/GOLDEN_CHANGELOG.md` entry |
-| `lint` | PR, main | Ruff, mypy and the layer contract (`lint-imports`) |
-| `test` | PR, main | The fast suite with branch coverage of 80% or more; coverage report uploaded |
+| `lint` | PR, main | Ruff with 18 rule families, mypy in strict mode, and three import contracts (`lint-imports`) |
+| `test` | PR, main | The fast suite with branch coverage of 80% or more, then the slow suite: the 5,000-row golden replay and the regeneration checks; coverage report uploaded |
 | `image-smoke` | PR, main (after lint and test) | The image builds under the 600 MB budget and serves predictions. Also checks the headers and the 422 envelope, the non-root user, no curl or pip in the image, a `healthy` healthcheck and the compose stack |
 | `image-scan` | PR, main (after lint and test) | Trivy finds no fixable HIGH or CRITICAL vulnerability; full report and CycloneDX SBOM uploaded |
 | `publish` | main only | Pushes `ghcr.io/aaturki/fraud-service:<commit-sha>` and `:main`, never `latest` alone, with a signed build provenance attestation for the digest |
