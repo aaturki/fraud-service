@@ -35,6 +35,35 @@ jobs:
             ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
             git /repo --redact --no-banner --exit-code 1
 
+  golden-guard:                 # a golden file never changes without a recorded reason
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+      - name: Golden changes need a docs/GOLDEN_CHANGELOG.md entry
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "No base commit to compare with (first push or manual run): nothing to check."
+            exit 0
+          fi
+          changed=$(git diff --name-only "$BASE" HEAD)
+          if echo "$changed" | grep -q '^data/golden_scores'; then
+            if echo "$changed" | grep -qx 'docs/GOLDEN_CHANGELOG.md'; then
+              echo "Golden file changed with a changelog entry:"
+              git diff "$BASE" HEAD -- docs/GOLDEN_CHANGELOG.md
+            else
+              echo "::error::A golden file changed without an entry in docs/GOLDEN_CHANGELOG.md."
+              echo "Regenerate it with: make regen-golden REASON=\"...\""
+              exit 1
+            fi
+          else
+            echo "No golden file changed."
+          fi
+
   lint:                         # cheapest gate first: seconds, not minutes
     runs-on: ubuntu-latest
     timeout-minutes: 10
