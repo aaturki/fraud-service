@@ -29,10 +29,16 @@ class PredictResponse(BaseModel):
     trace_id: str
 
 
+class ErrorDetail(BaseModel):
+    field: str         # where the contract was broken, e.g. "amount_sar"
+    problem: str       # what was wrong; never the offending value
+
+
 class ErrorBody(BaseModel):
     code: str          # stable machine-readable contract
     message: str       # human-readable, may change
     trace_id: str
+    details: list[ErrorDetail] | None = None     # present on INVALID_REQUEST only
 
 
 class ErrorEnvelope(BaseModel):
@@ -43,3 +49,9 @@ class HealthResponse(BaseModel):
     status: str
     git_sha: str
     started_at: datetime
+
+
+class ReadyResponse(BaseModel):
+    status: str
+    model_version: str
+    checked_at: datetime
