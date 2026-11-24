@@ -22,6 +22,9 @@ test:             ## The per-commit gate
 test-all:         ## Everything, including the slow golden-file test
 	pytest
 
+regen-golden:     ## Rewrite the golden file for a NEW model, with a reason: REASON="..."
+	python scripts/regen_golden.py --reason "$(REASON)"
+
 lock:             ## Pin every dependency for the Linux image
 	uv pip compile pyproject.toml --python-version 3.12 --python-platform linux \
 	    --no-annotate --no-header -o requirements.lock
@@ -40,4 +43,4 @@ smoke:            ## End-to-end check against the running container
 	curl -fsS localhost:8000/v1/predict -H "content-type: application/json" \
 	     -d @payloads/sample.json && echo
 
-.PHONY: install run run-batch lint test test-all lock image image-size up smoke
+.PHONY: install run run-batch lint test test-all regen-golden lock image image-size up smoke
