@@ -169,19 +169,29 @@ cannot create unbounded series.
 
 ## Tests
 
-    pytest -m "not slow" --cov --cov-fail-under=80     # every commit: 145 tests, about 9 s, 100% branch coverage
+    pytest -m "not slow" --cov --cov-fail-under=80     # every commit: 155 tests, about 7 s, 100% branch coverage
+    pytest -m data                                     # the data checks alone
     pytest                                             # everything, including the 5,000-row golden file
     ruff check src tests && mypy src/fraud_service && lint-imports
 
-Three levels: `tests/unit` (pure logic, no I/O), `tests/integration` (the app through
-`TestClient`, with a fake model injected), and `tests/behavioural` (the real artefact). What
-the behavioural tests claim about the model:
+Four levels: `tests/unit` (pure logic, no I/O), `tests/integration` (the app through
+`TestClient`, with a fake model injected), `tests/behavioural` (the real artefact), and
+`tests/data_checks` (the data files themselves). What the behavioural tests claim about the
+model:
 
 - **Invariance:** casing and stray spaces in the merchant category do not move the score.
 - **Invariance:** the customer id and the transaction id do not move the score.
 - **Direction:** all else equal, a much larger amount never lowers the fraud probability.
 - **Consistency:** the batch path returns exactly the one-by-one probabilities.
+- **Quality floor:** on the 5,000 labelled sample transactions, the AUC stays at 0.80 or more (0.857 today) and at least 0.10 above ranking by amount alone (0.684). The notebook trained on this sample, so this is a tripwire for a model that got worse, not a promise about new data.
+- **Policy outcome:** at the default threshold, a block is fraud at least 90% of the time (10 of 10 today), and at least 8% of frauds reach review or block (10.4% today). Most fraud is still allowed at 0.85; the test keeps that trade-off visible.
 - **Golden file:** all 5,000 reference rows reproduce within 1e-6. This is the skew tripwire; it is slow, so it runs nightly.
+
+The data checks read `data/` and never write it. The sample has the expected columns, no
+gaps, unique ids, all four channels, and UTC times with none in the future, and every row
+passes the API firewall. The golden file holds real probabilities for exactly the sample's
+transactions, row for row. Each claim, data and behavioural, was broken on purpose in memory
+to confirm that a test catches it.
 
 All 46 payloads in `payloads/malformed/` are rejected with 422. That is the workshop's 40
 plus the 6 cases added by contract 1.1 ([CHANGELOG.md](CHANGELOG.md)), and a test stops the
@@ -241,7 +251,7 @@ Beyond the mandatory scope, each with tests:
 | Path | What |
 |---|---|
 | `src/fraud_service/` | The service: `domain/`, `service/`, `adapters/`, `api/`, `config.py`, `logging_setup.py` |
-| `tests/` | `unit/`, `integration/`, `behavioural/` |
+| `tests/` | `unit/`, `integration/`, `behavioural/`, `data_checks/` |
 | `payloads/` | `sample.json` and the 46-payload malformed corpus |
 | `data/`, `models/` | Synthetic transactions, golden scores, the model artefact (never edited by hand) |
 | `scripts/` | Load test, async-trap demo, golden check and regeneration, container benchmarks |
