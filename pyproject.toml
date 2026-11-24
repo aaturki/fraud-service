@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fraud-service"
-version = "1.1.0"
+version = "1.1.1"
 description = "Raqib: a fraud-scoring model service (SDAIA Academy, SDA-AIE-113)"
 readme = "README.md"
 requires-python = ">=3.12"
