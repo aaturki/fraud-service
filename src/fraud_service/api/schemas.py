@@ -3,6 +3,7 @@ They convert to/from domain entities in routes and never leak inward.
 
 Contract v1.1 (the stricter firewall, see CHANGELOG.md): an amount is a JSON number, never
 a string or a boolean, and a timestamp is ISO 8601 text with an explicit UTC offset.
+Contract v1.2 adds `reasons` to the /v1/predict response: additive, nothing removed.
 """
 from collections.abc import Sequence
 from datetime import datetime
