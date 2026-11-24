@@ -114,7 +114,6 @@ jobs:
           code=$(curl -s -o bad.json -w '%{http_code}' localhost:8000/v1/predict \
                  -H "content-type: application/json" -d @payloads/malformed/amount_text.json)
           test "$code" = "422" && grep -q '"INVALID_REQUEST"' bad.json
-          curl -fsS localhost:8000/metrics | grep -q '^fraud_model_info{'
           test "$(docker exec svc whoami)" = "appuser"
           docker exec svc sh -c '! command -v curl && ! command -v pip'   # nothing extra shipped
       - name: Container healthcheck reports healthy

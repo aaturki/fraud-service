@@ -14,6 +14,13 @@ RUN python -m venv /opt/venv \
 # ---------- Stage 2: runtime ----------
 FROM ${PYTHON_IMAGE} AS runtime
 
+# Debian security fixes published after the pinned base image was built (the scan gate
+# found CVE-2026-85091 in zlib1g on 24 Nov 2026). Drop this line once Dependabot moves the
+# digest to an official image that already contains the fixes.
+RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 # Non-root user: the first thing any security review checks. No curl and no pip in the
 # final image: fewer binaries, fewer CVEs to triage; the healthcheck uses Python itself.
 RUN useradd --create-home --uid 10001 appuser \
