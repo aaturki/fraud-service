@@ -35,6 +35,33 @@ jobs:
             ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
             git /repo --redact --no-banner --exit-code 1
 
+  pre-commit:                   # the hooks developers run before each commit, kept honest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install pre-commit
+      - name: Every hook passes on the whole repository
+        run: pre-commit run --all-files --show-diff-on-failure
+      - name: The secret hook blocks a fake token (the Lab 6 drill, automated)
+        run: |
+          # A random token in GitHub's format: made here, never committed, never printed.
+          printf 'FRAUD_REGISTRY_TOKEN=ghp_%s\n' "$(openssl rand -hex 18)" > drill.env
+          git add drill.env
+          if pre-commit run gitleaks > drill.log 2>&1; then
+            cat drill.log
+            echo "::error::The pre-commit secret scan let a GitHub token through."
+            exit 1
+          fi
+          cat drill.log                       # gitleaks redacts the token itself
+          grep -q 'github-pat' drill.log      # blocked, and for the right reason
+          echo "The pre-commit secret scan blocked the fake token, as it should."
+          git rm --cached --quiet drill.env
+          rm drill.env drill.log
+
   golden-guard:                 # a golden file never changes without a recorded reason
     runs-on: ubuntu-latest
     timeout-minutes: 5
