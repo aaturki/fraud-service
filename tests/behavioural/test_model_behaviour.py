@@ -5,7 +5,9 @@ from sklearn.metrics import roc_auc_score
 
 from fraud_service.config import Settings
 from fraud_service.domain.entities import Decision, RawScore, Transaction
-from fraud_service.domain.policies import decide
+from fraud_service.domain.explanations import EXPLAINED_FIELDS
+from fraud_service.domain.policies import REVIEW_BAND, decide
+from fraud_service.service.scorer import FraudScorer
 
 pytestmark = pytest.mark.behavioural
 
@@ -87,6 +89,24 @@ def test_default_policy_outcome_on_the_labelled_sample(labelled_sample):
     assert len(blocked) > 0, "the default threshold blocks nothing"
     assert blocked.mean() >= 0.90, f"only {blocked.mean():.0%} of blocks are fraud"
     assert flagged.sum() / fraud.sum() >= 0.08, f"only {flagged.sum()} frauds reach an analyst"
+
+
+def test_every_alert_in_the_sample_has_a_reason_that_matters(real_model, labelled_sample):
+    """Every review or block in the labelled sample (108 today) gets at least one reason,
+    reasons name model inputs only, and making the top one typical lowers the score by at
+    least 0.10 (the smallest such drop today is 0.115)."""
+    scorer = FraudScorer(model=real_model, block_threshold=DEFAULT_THRESHOLD)
+    alerts = labelled_sample[labelled_sample.score >= DEFAULT_THRESHOLD - REVIEW_BAND]
+    assert len(alerts) >= 100, "the claim must cover many alerts, not a handful"
+    for r in alerts.itertuples():
+        txn = Transaction(transaction_id=r.transaction_id, amount_sar=r.amount_sar,
+                          channel=r.channel, merchant_category=r.merchant_category,
+                          customer_id=r.customer_id, timestamp=r.timestamp)
+        score = scorer.score(txn)
+        reasons = scorer.explain(txn, score)
+        assert reasons, f"{txn.transaction_id} was flagged without a reason"
+        assert {x.field for x in reasons} <= set(EXPLAINED_FIELDS)
+        assert reasons[0].effect >= 0.10, f"{txn.transaction_id}: top reason barely matters"
 
 
 @pytest.mark.slow
