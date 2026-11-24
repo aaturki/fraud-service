@@ -1,0 +1,13 @@
+{
+ "items": [
+  {"transaction_id": "TXN-2026-10001", "amount_sar": 249.99, "channel": "ecom",
+   "merchant_category": "electronics", "customer_id": "CUST-00077",
+   "timestamp": "2026-07-05T03:30:00+03:00"},
+  {"transaction_id": "TXN-2026-10002", "amount_sar": "18000", "channel": "transfer",
+   "merchant_category": "jewellery", "customer_id": "CUST-00078",
+   "timestamp": "2026-07-05T02:10:00+03:00"},
+  {"transaction_id": "TXN-2026-10003", "amount_sar": 18000.0, "channel": "transfer",
+   "merchant_category": "jewellery", "customer_id": "CUST-00078",
+   "timestamp": "2026-07-05T02:10:00+03:00"}
+ ]
+}
