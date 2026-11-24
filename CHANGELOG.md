@@ -3,6 +3,25 @@
 All notable changes to the service contract and its behaviour. Versions follow
 [Semantic Versioning](https://semver.org/); the API path stays `/v1`.
 
+## 1.1.1: one instant, one score
+
+A fix: callers send exactly what they sent before. Version 1.1.0 promised that any offset is
+compared as the same instant, but the features read the clock in whatever offset the caller
+wrote. The model learned its hours in UTC (every training row is `+00:00`), so a caller using
+Riyadh time got a score three hours off. For the transaction in `payloads/sample.json` at
+00:30 UTC:
+
+| The same instant, written as | Hour the model saw in 1.1.0 | Score in 1.1.0 | Score in 1.1.1 |
+|---|---|---|---|
+| `2026-07-05T00:30:00+00:00` | 0 | 0.53180 | 0.53180 |
+| `2026-07-05T03:30:00+03:00` | 3 | 0.62614 | 0.53180 |
+
+The domain now converts every timestamp to UTC before any feature is computed. A time without
+an offset, which the API refuses, is read as UTC inside the domain. Callers who send UTC see
+no change, and all 5,000 golden rows still reproduce. Tests at three levels lock it: four
+spellings of one instant give one hour (unit), the model receives the UTC hour through the API
+(integration), and the real artefact gives one score for one instant (behavioural).
+
 ## 1.1.0: the stricter firewall
 
 Contract change for `POST /v1/predict`. Requests that version 1.0.0 coerced silently are now
