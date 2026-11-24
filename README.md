@@ -222,9 +222,9 @@ corpus from shrinking.
 | `nightly` | every night | The full suite, including the golden file |
 | `benchmarks` | by hand, Dockerfile changes | The container numbers in [BENCHMARKS.md](BENCHMARKS.md) |
 
-`main` is protected. A pull request is required, the checks `secrets`, `golden-guard`,
-`lint`, `test`, `image-smoke` and `image-scan` must pass, admins are included, and force
-pushes are blocked. `pre-commit` runs on every pull request but is not a required check.
+`main` is protected. A pull request is required, the checks `secrets`, `pre-commit`,
+`golden-guard`, `lint`, `test`, `image-smoke` and `image-scan` must pass, admins are
+included, and force pushes are blocked.
 Evidence is
 [pull request #1](https://github.com/aaturki/fraud-service/pull/1), the Lab 5 exercise. It
 broke the layer contract and moved a feature boundary (`hour < 6` to `hour <= 6`), and
