@@ -94,7 +94,7 @@ root.
 | `channel` | one of `pos`, `ecom`, `atm`, `transfer` |
 | `merchant_category` | text, 2 to 40 characters, at least 2 visible |
 | `customer_id` | text, 4 to 64 characters |
-| `timestamp` | ISO 8601 text **with an offset**, for example `2026-07-05T03:30:00+03:00` |
+| `timestamp` | ISO 8601 text **with an offset**, for example `2026-07-05T03:30:00+03:00`. Features read the UTC hour, the clock the model was trained on, so one instant scores the same in any offset |
 
 **Response**
 
@@ -178,7 +178,7 @@ cannot create unbounded series.
 
 ## Tests
 
-    pytest -m "not slow" --cov --cov-fail-under=80     # every commit: 155 tests, about 7 s, 100% branch coverage
+    pytest -m "not slow" --cov --cov-fail-under=80     # every commit: 164 tests, about 8 s, 100% branch coverage
     pytest -m data                                     # the data checks alone
     pytest                                             # everything, including the 5,000-row golden file
     ruff check src tests && mypy src/fraud_service && lint-imports
@@ -190,6 +190,7 @@ model:
 
 - **Invariance:** casing and stray spaces in the merchant category do not move the score.
 - **Invariance:** the customer id and the transaction id do not move the score.
+- **Invariance:** one instant gets one score, whatever UTC offset it is written in (version 1.1.1).
 - **Direction:** all else equal, a much larger amount never lowers the fraud probability.
 - **Consistency:** the batch path returns exactly the one-by-one probabilities.
 - **Quality floor:** on the 5,000 labelled sample transactions, the AUC stays at 0.80 or more (0.857 today) and at least 0.10 above ranking by amount alone (0.684). The notebook trained on this sample, so this is a tripwire for a model that got worse, not a promise about new data.
@@ -246,7 +247,7 @@ proposes the updates, which go through the same gates.
 Beyond the mandatory scope, each with tests:
 
 1. **Batch endpoint:** `POST /v1/predict:batch`, up to 256 items with per-item results. Try it: `curl -s localhost:8000/v1/predict:batch -H "content-type: application/json" -d @payloads/batch_sample.json` (two valid items, one with a text amount).
-2. **Stricter firewall:** contract 1.1 refuses text or boolean amounts and timestamps without an offset; the corpus grows from 40 to 46 payloads; documented in [CHANGELOG.md](CHANGELOG.md).
+2. **Stricter firewall:** contract 1.1 refuses text or boolean amounts and timestamps without an offset; the corpus grows from 40 to 46 payloads. Version 1.1.1 makes the offset count: one instant gets one score, whatever offset it is written in. Both are documented in [CHANGELOG.md](CHANGELOG.md).
 3. **Metrics endpoint:** `GET /metrics` with a request counter and a latency histogram.
 4. **Image scan gate:** Trivy pinned by SHA, failing the PR on fixable HIGH or CRITICAL issues, with a reviewed `.trivyignore`. It caught CVE-2026-85091 on its first run, and the image now applies the Debian fix.
 5. **Golden regeneration workflow:** `make regen-golden REASON="..."` refuses to run without a reason or under an unchanged model version. A pull request template carries an evidence checklist, and the `golden-guard` job enforces the changelog.

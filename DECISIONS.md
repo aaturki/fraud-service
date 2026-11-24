@@ -47,6 +47,15 @@ into a visible error. It is a breaking change for sloppy callers, so it is versi
 documented in [CHANGELOG.md](CHANGELOG.md), and the malformed corpus grew from 40 to 46
 payloads.
 
+Requiring an offset was only half of the job. Version 1.1.0 required one but did not use it:
+the features read the hour in whatever offset the caller wrote, so `03:30+03:00` reached the
+model as hour 3, although the model learned UTC hours (every training row is `+00:00`). The
+same instant written in UTC scored 0.53180; written in Riyadh time it scored 0.62614. Version
+1.1.1 converts every timestamp to UTC in the domain, before any feature is computed, and a
+test at each level (unit, integration, behavioural) proves that one instant gets one score.
+Whether "night" should one day mean the cardholder's local night is a question for the next
+model's training data, not for the serving code.
+
 ## 5. A batch answers per item, and only the envelope can fail as a whole
 
 `POST /v1/predict:batch` validates each item like a `/v1/predict` body and returns `200`, with
