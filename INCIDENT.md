@@ -21,10 +21,12 @@ reached a shared repository must be treated as public from that moment.
    (or BFG), force-push the rewritten refs once, ask collaborators to re-clone, and ask GitHub
    support to purge cached views if the repository is public. Never do this on `main` casually:
    it rewrites the shared history, so it is an incident action, announced in advance.
-4. **Stop the next one.** Keep `.env` and `*.env` in `.gitignore` and `.dockerignore`, commit
-   only `configs/settings.example.env`, and run a secret scanner on every pull request
-   (this repository runs gitleaks in CI). The service also masks sensitive log keys
-   (`token`, `password`, `secret`, `authorization`, ...) before a line is written.
+4. **Stop the next one.** Keep `.env` in `.gitignore` and `.dockerignore`, commit only
+   `configs/settings.example.env`, and scan before a secret can travel. This repository runs
+   gitleaks as a pre-commit hook on what is about to be committed, has GitHub push protection
+   on every push, and runs gitleaks over the whole history on every pull request. The service
+   also masks sensitive log keys (`token`, `password`, `secret`, `authorization`, ...) before a
+   line is written.
 
 ## Why the drill commits could simply be dropped
 

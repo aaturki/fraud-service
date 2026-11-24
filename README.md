@@ -45,6 +45,7 @@ Or run the image CI published, tagged with the commit SHA (and `main`):
     python -m venv .venv
     source .venv/bin/activate                  # Windows PowerShell: .venv\Scripts\Activate.ps1
     pip install -e ".[dev]"
+    pre-commit install                         # secret scan and file checks before each commit
     cp configs/settings.example.env .env       # Windows: Copy-Item configs\settings.example.env .env
     uvicorn fraud_service.api.app:create_app --factory
 
@@ -142,8 +143,16 @@ is an error.
 | `FRAUD_REDIS_URL` | `redis://localhost:6379/0` | The compose stack's Redis |
 | `FRAUD_REGISTRY_TOKEN` | unset | Secret, only from the platform's secret store; never logged |
 
-Secrets are never committed. `configs/settings.example.env` documents every knob, `.env` is
-git-ignored and docker-ignored, and gitleaks scans the whole history on every pull request.
+Secrets are never committed. `configs/settings.example.env` documents every knob, and `.env`
+is git-ignored and docker-ignored. A secret is looked for at three points, each earlier than
+the next would be:
+
+1. **Before each commit:** the gitleaks hook in `.pre-commit-config.yaml` scans what you are
+   about to commit. CI proves the hook works: it stages a freshly generated fake token and
+   expects a refusal.
+2. **On every push:** GitHub secret scanning and push protection are on for this repository.
+3. **On every pull request:** the `secrets` job runs gitleaks over the whole history.
+
 The secret-leak drill and the response runbook are in [INCIDENT.md](INCIDENT.md).
 
 ## Logs and metrics
@@ -202,6 +211,7 @@ corpus from shrinking.
 | Job | Runs on | What it proves |
 |---|---|---|
 | `secrets` | PR, main | gitleaks finds no secret anywhere in the history |
+| `pre-commit` | PR, main | Every pre-commit hook passes on the whole repository, and the gitleaks hook refuses a freshly generated fake token |
 | `golden-guard` | PR, main | A golden file never changes without a `docs/GOLDEN_CHANGELOG.md` entry |
 | `lint` | PR, main | Ruff, mypy and the layer contract (`lint-imports`) |
 | `test` | PR, main | The fast suite with branch coverage of 80% or more; coverage report uploaded |
@@ -211,8 +221,9 @@ corpus from shrinking.
 | `nightly` | every night | The full suite, including the golden file |
 | `benchmarks` | by hand, Dockerfile changes | The container numbers in [BENCHMARKS.md](BENCHMARKS.md) |
 
-`main` is protected. A pull request is required, the checks `secrets`, `lint`, `test`,
-`image-smoke` and `image-scan` must pass, admins are included, and force pushes are blocked.
+`main` is protected. A pull request is required, the checks `secrets`, `golden-guard`,
+`lint`, `test`, `image-smoke` and `image-scan` must pass, admins are included, and force
+pushes are blocked. `pre-commit` runs on every pull request but is not a required check.
 Evidence is
 [pull request #1](https://github.com/aaturki/fraud-service/pull/1), the Lab 5 exercise. It
 broke the layer contract and moved a feature boundary (`hour < 6` to `hour <= 6`), and
@@ -245,6 +256,7 @@ Beyond the mandatory scope, each with tests:
 - **The service refuses to start:** read the message. `model artefact not found` means `FRAUD_MODEL_PATH` is wrong, and `block_threshold` means the value is outside 0.5 to 0.99. A refusal at start-up is the intended behaviour.
 - **Scoring takes minutes on a many-core machine (often WSL):** set `OMP_NUM_THREADS=1`.
 - **`docker pull` is refused:** the package must be public, under Package settings, Change visibility.
+- **Windows blocks a program (`WinError 4551`, or a Smart App Control notice):** Smart App Control refuses unsigned programs, such as the `pytest.exe` launcher, the native library behind `lint-imports` and the pre-commit hooks. Nothing is wrong with the code. Run `python -m pytest`, skip `pre-commit install` on that machine, and rely on CI, which runs `lint-imports` and every hook on Linux for each pull request. Turning Smart App Control off is not needed.
 
 ## Repository layout
 
