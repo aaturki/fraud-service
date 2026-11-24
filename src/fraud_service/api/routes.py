@@ -1,16 +1,24 @@
 import time
+from collections import Counter
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import ValidationError
 
 from fraud_service.api.schemas import (
+    BatchItemResult,
+    BatchRequest,
+    BatchResponse,
+    BatchSummary,
     ErrorEnvelope,
     HealthResponse,
     PredictRequest,
     PredictResponse,
     ReadyResponse,
+    problems,
 )
+from fraud_service.domain.entities import Transaction
 from fraud_service.logging_setup import get_logger
 from fraud_service.service.scorer import FraudScorer
 
@@ -54,6 +62,49 @@ def predict(body: PredictRequest, request: Request, response: Response,
         decision=score.decision,
         model_version=score.model_version,
         trace_id=request.state.trace_id,
+    )
+
+
+@router.post("/predict:batch", response_model=BatchResponse, responses=ERROR_RESPONSES)
+def predict_batch(body: BatchRequest, request: Request, response: Response,
+                  scorer: Annotated[FraudScorer, Depends(get_scorer)]) -> BatchResponse:
+    """Up to 256 transactions in one call.
+
+    Defined behaviour for bad items: every item is validated on its own, like a /v1/predict
+    body. Valid items are scored; invalid ones come back as status "rejected" with the
+    field-level reasons, in the same position. The answer is 200 whenever the batch itself is
+    well formed, even if every item is rejected; the batch is refused with 422 only when it is
+    not an object holding 1 to 256 items.
+    """
+    t0 = time.perf_counter()
+    results: dict[int, BatchItemResult] = {}
+    valid: list[tuple[int, Transaction]] = []
+    for index, item in enumerate(body.items):
+        try:
+            valid.append((index, PredictRequest.model_validate(item).to_domain()))
+        except ValidationError as exc:
+            results[index] = BatchItemResult(index=index, status="rejected",
+                                             details=problems(exc.errors()))
+    scores = scorer.score_many([txn for _, txn in valid])
+    for (index, _), score in zip(valid, scores, strict=True):
+        results[index] = BatchItemResult(index=index, status="scored",
+                                         transaction_id=score.transaction_id,
+                                         fraud_probability=round(score.probability, 6),
+                                         decision=score.decision)
+    version = scorer.model.model_version
+    log.info("batch_served", items=len(body.items), scored=len(scores),
+             rejected=len(body.items) - len(scores),
+             decisions=dict(Counter(score.decision.value for score in scores)),
+             model_version=version,
+             latency_ms=round((time.perf_counter() - t0) * 1000, 1))
+    # ABSENT by design, as for single predictions: identifiers, amounts, raw probabilities
+    response.headers["X-Model-Version"] = version
+    response.headers["Cache-Control"] = "no-store"
+    return BatchResponse(
+        model_version=version, trace_id=request.state.trace_id,
+        summary=BatchSummary(total=len(body.items), scored=len(scores),
+                             rejected=len(body.items) - len(scores)),
+        results=[results[i] for i in range(len(body.items))],
     )
 
 

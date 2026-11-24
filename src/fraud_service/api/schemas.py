@@ -4,7 +4,9 @@ They convert to/from domain entities in routes and never leak inward.
 Contract v1.1 (the stricter firewall, see CHANGELOG.md): an amount is a JSON number, never
 a string or a boolean, and a timestamp is ISO 8601 text with an explicit UTC offset.
 """
+from collections.abc import Sequence
 from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 from pydantic_core import PydanticCustomError
@@ -81,3 +83,46 @@ class ReadyResponse(BaseModel):
     status: str
     model_version: str
     checked_at: datetime
+
+
+# ---- Batch extension: POST /v1/predict:batch -------------------------------------------
+
+MAX_BATCH_ITEMS = 256
+
+
+class BatchRequest(BaseModel):
+    """1 to 256 transactions. Each item is validated on its own, exactly like a
+    /v1/predict body, so one bad item cannot sink the other 255."""
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[Any] = Field(min_length=1, max_length=MAX_BATCH_ITEMS,
+                             description="Each item has the shape of a /v1/predict body")
+
+
+class BatchItemResult(BaseModel):
+    index: int                                  # position in the request: results keep order
+    status: Literal["scored", "rejected"]
+    transaction_id: str | None = None
+    fraud_probability: float | None = Field(default=None, ge=0, le=1)
+    decision: Decision | None = None
+    details: list[ErrorDetail] | None = None    # why a rejected item was refused
+
+
+class BatchSummary(BaseModel):
+    total: int
+    scored: int
+    rejected: int
+
+
+class BatchResponse(BaseModel):
+    model_version: str
+    trace_id: str
+    summary: BatchSummary
+    results: list[BatchItemResult]
+
+
+def problems(errors: Sequence[Any], prefix_parts: int = 0,
+             root: str = "item") -> list[ErrorDetail]:
+    """Field names and messages from a pydantic error list; never the input values."""
+    return [ErrorDetail(field=".".join(str(p) for p in err["loc"][prefix_parts:]) or root,
+                        problem=err["msg"]) for err in errors]
