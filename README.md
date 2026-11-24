@@ -230,6 +230,12 @@ Evidence is
 broke the layer contract and moved a feature boundary (`hour < 6` to `hour <= 6`), and
 `lint` and `test` blocked it:
 
+![Pull request #1 blocked: lint and test fail, four newer required checks never reported, and the merge button is disabled](docs/blocked-pr.jpg)
+
+Captured on 24 November 2026 in the GitHub web interface. The four checks marked *Expected*
+were added to `main` after the pull request was opened, so they never ran on it, and a
+required check that never ran blocks a merge just as a failing one does.
+
 The failing run is [45306753157](https://github.com/aaturki/fraud-service/actions/runs/45306753157). `lint` stopped at Ruff (`I001`, the stray import), and `test` failed `test_night_flag_boundaries[6-0]`.
 
 Every action is pinned to a full commit SHA and both base images to a digest. Dependabot
