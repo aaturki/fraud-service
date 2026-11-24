@@ -30,6 +30,13 @@ def test_invariance_to_identifiers(real_model, make_txn):
     assert a == pytest.approx(b, abs=1e-9)
 
 
+def test_invariance_to_how_the_time_is_written(real_model, make_txn):
+    """One instant, one score: 00:30 UTC written in Riyadh time must not move the hour."""
+    utc = _score(real_model, make_txn(timestamp="2026-07-05T00:30:00+00:00"))
+    riyadh = _score(real_model, make_txn(timestamp="2026-07-05T03:30:00+03:00"))
+    assert riyadh == pytest.approx(utc, abs=1e-9)
+
+
 @pytest.mark.parametrize("small, large", [(50.0, 50_000.0), (5.0, 500.0), (900.0, 90_000.0)])
 def test_directional_amount(real_model, make_txn, small, large):
     """All else equal, a much larger amount must not LOWER fraud probability."""

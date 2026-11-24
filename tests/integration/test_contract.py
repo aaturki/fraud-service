@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from fraud_service.api.app import MAX_BODY_BYTES, create_app
+from fraud_service.api.routes import get_scorer
 from fraud_service.domain.entities import FeatureVector, RawScore
 from fraud_service.service.scorer import FraudScorer
 
@@ -111,6 +112,29 @@ def test_every_request_log_line_names_trace_and_model(ready_client, capsys):
     assert {line["event"] for line in mine} >= {"prediction_served", "http_request"}
     assert all(line["model_version"] == "test-9" for line in mine)
     assert not any("customer_id" in line or "amount_sar" in line for line in mine)
+
+
+class HourEchoModel:
+    """Answers with the hour it was given, so a test can see what reached the model."""
+    model_version = "hour-echo"
+
+    def predict_proba(self, features: FeatureVector) -> RawScore:
+        return RawScore(value=features.values["hour_of_day"] / 100)
+
+    def predict_proba_many(self, features: list[FeatureVector]) -> list[RawScore]:
+        return [self.predict_proba(f) for f in features]
+
+
+@pytest.mark.parametrize("written_as", ["2026-07-05T03:30:00Z", "2026-07-05T06:30:00+03:00",
+                                        "2026-07-04T22:30:00-05:00"])
+def test_the_model_receives_the_utc_hour_whatever_the_offset(written_as):
+    """Three spellings of 03:30 UTC. The model was trained on UTC hours, so it must see 3."""
+    app = create_app()
+    app.dependency_overrides[get_scorer] = lambda: FraudScorer(model=HourEchoModel(),
+                                                               block_threshold=0.85)
+    r = TestClient(app).post("/v1/predict", json={**SAMPLE, "timestamp": written_as})
+    assert r.status_code == 200
+    assert r.json()["fraud_probability"] == pytest.approx(0.03)
 
 
 def test_openapi_documents_the_error_envelope(ready_client):
