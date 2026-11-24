@@ -108,3 +108,16 @@ known token formats at the push, the `secrets` job scans the whole history on ev
 request, and the `pre-commit` job stages a freshly generated fake GitHub token and fails if
 the hook ever stops refusing it. I weighed a pre-push hook instead: it catches the secret one
 step later, when it already sits in a local commit that has to be rewritten.
+
+## 9. Reasons from a one-input-at-a-time comparison, not SHAP
+
+An analyst who sees a block needs to know why, and the project guide's fraud track asks for the
+top reasons behind each alert. I weighed SHAP, the usual choice for tree models. It would add a
+runtime dependency (more image surface, more scan findings) and code that reaches inside the
+scikit-learn pipeline, so the explanation would live in the adapter and depend on the model
+type. Instead the service compares the transaction with a typical one, one input at a time:
+four variants, scored in one batched call through the `Model` protocol. That works for any
+model behind the protocol, an ONNX one included, and costs nothing for an allow. The known
+limits: one input at a time ignores interactions, so the effects do not add up to the score,
+and a reason explains the model, not the truth about the transaction. The typical values come
+from the training sample, and a data check keeps them there.

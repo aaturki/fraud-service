@@ -96,10 +96,23 @@ root.
 | `customer_id` | text, 4 to 64 characters |
 | `timestamp` | ISO 8601 text **with an offset**, for example `2026-07-05T03:30:00+03:00`. Features read the UTC hour, the clock the model was trained on, so one instant scores the same in any offset |
 
-**Response**
+**Response** for `payloads/sample.json`, an allow:
 
     {"transaction_id": "TXN-2026-00042", "fraud_probability": 0.62614, "decision": "allow",
-     "model_version": "v3.2.0", "trace_id": "my-trace-1"}
+     "model_version": "v3.2.0", "trace_id": "my-trace-1", "reasons": []}
+
+**Reasons behind an alert** (contract 1.2). For a review or a block, `reasons` lists up to
+three request fields that pushed the score up, strongest first. `effect` is how much lower the
+probability is when that field takes its typical value (149.24 SAR, `pos`, `ELECTRONICS`,
+12:00 UTC). A 9,500 SAR transfer at 02:10 UTC, answered by the real model:
+
+    {"transaction_id": "TXN-2026-00042", "fraud_probability": 0.879279, "decision": "block",
+     "model_version": "v3.2.0", "trace_id": "my-trace-2",
+     "reasons": [{"field": "amount_sar", "effect": 0.352}, {"field": "channel", "effect": 0.102},
+                 {"field": "timestamp", "effect": 0.062}]}
+
+A reason names a field, never its value, and identifiers are never reasons. An allow needs no
+reasons and costs no extra model call; an alert costs one batched call for four variants.
 
 **Headers on every response.**
 - `X-Trace-Id`: the caller's value is kept if it matches `[A-Za-z0-9._:-]{1,64}`, otherwise
@@ -164,7 +177,7 @@ Every log line is one JSON object on stdout, in UTC, with the request's `trace_i
 | `settings_effective` | What the process really runs with (no secrets) |
 | `model_loaded` | Model version and load time |
 | `http_request` | Method, path, status, latency |
-| `prediction_served` | Decision, probability bucketed to 0.1, model version, latency. Never the customer id, the amount or raw features |
+| `prediction_served` | Decision, probability bucketed to 0.1, the names of the reason fields, model version, latency. Never the customer id, the amount or raw features |
 | `batch_served` | Item counts and decisions only |
 
 Sensitive keys (`token`, `password`, `secret`, `authorization`, ...) are masked even if
@@ -178,7 +191,7 @@ cannot create unbounded series.
 
 ## Tests
 
-    pytest -m "not slow" --cov --cov-fail-under=80     # every commit: 164 tests, about 8 s, 100% branch coverage
+    pytest -m "not slow" --cov --cov-fail-under=80     # every commit: 176 tests, about 10 s, 100% branch coverage
     pytest -m data                                     # the data checks alone
     pytest                                             # everything, including the 5,000-row golden file
     ruff check src tests && mypy src/fraud_service && lint-imports
@@ -195,6 +208,7 @@ model:
 - **Consistency:** the batch path returns exactly the one-by-one probabilities.
 - **Quality floor:** on the 5,000 labelled sample transactions, the AUC stays at 0.80 or more (0.857 today) and at least 0.10 above ranking by amount alone (0.684). The notebook trained on this sample, so this is a tripwire for a model that got worse, not a promise about new data.
 - **Policy outcome:** at the default threshold, a block is fraud at least 90% of the time (10 of 10 today), and at least 8% of frauds reach review or block (10.4% today). Most fraud is still allowed at 0.85; the test keeps that trade-off visible.
+- **Reasons:** each of the 108 alerts in the labelled sample gets at least one reason, reasons name model inputs only, and making the top reason typical lowers the score by at least 0.10 (0.115 at least today).
 - **Golden file:** all 5,000 reference rows reproduce within 1e-6. This is the skew tripwire; it is slow, so it runs nightly.
 
 The data checks read `data/` and never write it. The sample has the expected columns, no
@@ -269,6 +283,7 @@ Beyond the mandatory scope, each with tests:
 3. **Metrics endpoint:** `GET /metrics` with a request counter and a latency histogram.
 4. **Image scan gate:** Trivy pinned by SHA, failing the PR on fixable HIGH or CRITICAL issues, with a reviewed `.trivyignore`. It caught CVE-2026-85091 on its first run, and the image now applies the Debian fix.
 5. **Golden regeneration workflow:** `make regen-golden REASON="..."` refuses to run without a reason or under an unchanged model version. A pull request template carries an evidence checklist, and the `golden-guard` job enforces the changelog.
+6. **Reasons behind every alert:** contract 1.2 adds `reasons` to review and block answers, the fraud track's "top reasons behind each alert". Tested as a rule (unit), in the service, through the API and on the real model's 108 sample alerts, and a data check keeps the typical transaction in step with the data. See decision 9 in [DECISIONS.md](DECISIONS.md).
 
 ## Troubleshooting
 
