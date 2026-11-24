@@ -1,7 +1,8 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from fraud_service.domain.entities import FraudScore, RawScore, Transaction
+from fraud_service.domain.entities import Decision, FraudScore, RawScore, Transaction
+from fraud_service.domain.explanations import Reason, strongest_reasons, typical_variants
 from fraud_service.domain.policies import decide
 from fraud_service.service.interfaces import Model
 
@@ -28,6 +29,16 @@ class FraudScorer:
             return []
         raws = self.model.predict_proba_many([txn.to_features() for txn in txns])
         return [self._to_score(txn, raw) for txn, raw in zip(txns, raws, strict=True)]
+
+    def explain(self, txn: Transaction, score: FraudScore) -> list[Reason]:
+        """The reasons behind an alert, from one batched model call. An allowed transaction
+        needs none, and costs no extra call."""
+        if score.decision is Decision.ALLOW:
+            return []
+        variants = typical_variants(txn)
+        raws = self.model.predict_proba_many([v.to_features() for v in variants.values()])
+        return strongest_reasons(
+            score.probability, {field: raw.value for field, raw in zip(variants, raws, strict=True)})
 
     def _to_score(self, txn: Transaction, raw: RawScore) -> FraudScore:
         return FraudScore(
