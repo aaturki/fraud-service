@@ -11,6 +11,12 @@ from pydantic import ValidationError
 
 from fraud_service.api.schemas import PredictRequest
 from fraud_service.domain.entities import Channel
+from fraud_service.domain.explanations import (
+    TYPICAL_AMOUNT_SAR,
+    TYPICAL_CATEGORY,
+    TYPICAL_CHANNEL,
+    TYPICAL_HOUR_UTC,
+)
 
 pytestmark = pytest.mark.data
 
@@ -66,6 +72,15 @@ def test_every_sample_row_passes_the_api_firewall(sample):
         except ValidationError:
             rejected.append(row["transaction_id"])
     assert not rejected, f"{len(rejected)} rows rejected, first: {rejected[:5]}"
+
+
+def test_typical_values_for_reasons_describe_the_sample(sample):
+    """Reasons compare a transaction with a typical one: it must be typical of this sample."""
+    hours = pd.to_datetime(sample.timestamp, format="ISO8601").dt.hour
+    assert round(float(sample.amount_sar.median()), 2) == TYPICAL_AMOUNT_SAR
+    assert sample.channel.mode()[0] == TYPICAL_CHANNEL.value
+    assert sample.merchant_category.mode()[0] == TYPICAL_CATEGORY
+    assert int(hours.median()) == TYPICAL_HOUR_UTC
 
 
 def test_golden_file_has_the_expected_columns_and_no_gaps(golden):
