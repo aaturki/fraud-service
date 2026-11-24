@@ -238,6 +238,11 @@ required check that never ran blocks a merge just as a failing one does.
 
 The failing run is [45306753157](https://github.com/aaturki/fraud-service/actions/runs/45306753157). `lint` stopped at Ruff (`I001`, the stray import), and `test` failed `test_night_flag_boundaries[6-0]`.
 
+After the screenshot, both mistakes were undone on the same branch, without touching a test
+([`e1e2639`](https://github.com/aaturki/fraud-service/commit/e1e2639)). Every required check
+passed ([run 45365061619](https://github.com/aaturki/fraud-service/actions/runs/45365061619)),
+and the pull request was merged.
+
 Every action is pinned to a full commit SHA and both base images to a digest. Dependabot
 proposes the updates, which go through the same gates.
 
