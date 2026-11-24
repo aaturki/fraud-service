@@ -64,6 +64,7 @@ ignore = ["TRY003"]
 [tool.mypy]
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
+strict = true                      # every function typed, no implicit Any, no untyped calls
 ignore_missing_imports = true      # joblib and scikit-learn ship no type stubs
 
 [tool.importlinter]
