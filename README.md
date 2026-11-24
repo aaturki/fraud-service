@@ -6,9 +6,10 @@
 A containerised machine-learning service that scores card transactions for fraud risk and
 answers **allow**, **review** or **block**.
 
-Built in the training program **SDA-AIE-113 · Software Engineering Practices for AI Systems**
-at [SDAIA Academy](https://github.com/SDAIAAcademy), November 2026. Workshop:
-[aie113.ibrahimalshehri.sa](https://aie113.ibrahimalshehri.sa) · starter repository:
+**Turki Ahmed Alsulayyi (تركي أحمد الصليع)** — Software Engineering Practices for AI Systems, run
+22–24 November 2026, SDAIA Academy (course code SDA-AIE-113).
+
+Workshop: [aie113.ibrahimalshehri.sa](https://aie113.ibrahimalshehri.sa) · starter repository:
 [snow10100/fraud-service](https://github.com/snow10100/fraud-service).
 
 ## What it does
@@ -308,5 +309,6 @@ Beyond the mandatory scope, each with tests:
 
 ## Author
 
-Turki · [github.com/aaturki](https://github.com/aaturki). Built in SDA-AIE-113 at SDAIA
-Academy, November 2026.
+Turki Ahmed Alsulayyi (تركي أحمد الصليع) · [github.com/aaturki](https://github.com/aaturki) —
+Software Engineering Practices for AI Systems, run 22–24 November 2026, SDAIA Academy (course
+code SDA-AIE-113).
