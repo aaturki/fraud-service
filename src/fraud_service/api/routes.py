@@ -36,7 +36,7 @@ ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
 
 def get_scorer(request: Request) -> FraudScorer:
     """DI seam: tests override this one function to inject fakes."""
-    scorer = getattr(request.app.state, "scorer", None)
+    scorer: FraudScorer | None = getattr(request.app.state, "scorer", None)
     if scorer is None:                         # startup incomplete or failed
         raise HTTPException(status_code=503, detail="Model not ready",
                             headers={"Retry-After": "5"})
