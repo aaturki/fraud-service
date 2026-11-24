@@ -122,6 +122,8 @@ jobs:
       - run: pip install -e ".[dev]"
       - name: Fast suite, including behavioural tests on the real artefact
         run: pytest -m "not slow" --cov --cov-report=term-missing --cov-report=html --cov-fail-under=80
+      - name: Slow suite on every pull request (the 5,000-row golden replay, golden regeneration)
+        run: pytest -m slow
       - name: Upload coverage report
         if: always()            # evidence even on failure
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
