@@ -257,6 +257,8 @@ jobs:
     permissions:
       contents: read
       packages: write           # scoped token for the GHCR push
+      id-token: write           # a short-lived OIDC identity signs the provenance: no stored key
+      attestations: write       # record the signed provenance with GitHub
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Image name must be lowercase
@@ -278,6 +280,12 @@ jobs:
             ${{ env.IMAGE }}:${{ github.sha }}
             ${{ env.IMAGE }}:main
           cache-from: type=gha
+      - name: Signed build provenance for the pushed digest (keyless, through OIDC)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true     # the attestation travels with the image in GHCR
       - name: Record what was published
         run: |
           {
@@ -286,4 +294,6 @@ jobs:
             echo "Digest: \`${{ steps.push.outputs.digest }}\`"
             echo ""
             echo "Pull it: \`docker pull ${IMAGE}:${GITHUB_SHA}\`"
+            echo ""
+            echo "Verify where it came from: \`gh attestation verify oci://${IMAGE}:${GITHUB_SHA} --owner ${GITHUB_REPOSITORY_OWNER}\`"
           } >> "$GITHUB_STEP_SUMMARY"
