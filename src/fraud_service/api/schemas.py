@@ -49,12 +49,23 @@ class PredictRequest(BaseModel):
         return Transaction(**self.model_dump())
 
 
+class ReasonOut(BaseModel):
+    """One reason behind an alert: a request field, never its value."""
+    field: str = Field(examples=["amount_sar"])
+    effect: float = Field(examples=[0.58], description="How much lower fraud_probability is "
+                                                       "when this field takes its typical value")
+
+
 class PredictResponse(BaseModel):
     transaction_id: str
     fraud_probability: float = Field(ge=0, le=1)
     decision: Decision
     model_version: str
     trace_id: str
+    reasons: list[ReasonOut] = Field(
+        default_factory=list,
+        description="For review and block: up to three request fields that pushed the score "
+                    "up, strongest first. Empty for allow. Added in contract 1.2.")
 
 
 class ErrorDetail(BaseModel):

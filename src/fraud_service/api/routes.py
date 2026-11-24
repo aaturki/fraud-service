@@ -16,6 +16,7 @@ from fraud_service.api.schemas import (
     PredictRequest,
     PredictResponse,
     ReadyResponse,
+    ReasonOut,
     problems,
 )
 from fraud_service.domain.entities import Transaction
@@ -47,10 +48,13 @@ def predict(body: PredictRequest, request: Request, response: Response,
             scorer: Annotated[FraudScorer, Depends(get_scorer)]) -> PredictResponse:
     # Plain `def`: inference blocks, so FastAPI runs it in a worker thread.
     t0 = time.perf_counter()
-    score = scorer.score(body.to_domain())
+    txn = body.to_domain()
+    score = scorer.score(txn)
+    reasons = scorer.explain(txn, score)                # empty for allow, at no extra cost
     log.info("prediction_served",
              decision=score.decision.value,
              probability_bucket=round(score.probability, 1),   # bucketed, never raw
+             reasons=[r.field for r in reasons],               # field names, never values
              model_version=score.model_version,
              latency_ms=round((time.perf_counter() - t0) * 1000, 1))
     # ABSENT by design: customer_id, amount, raw feature values
@@ -63,6 +67,7 @@ def predict(body: PredictRequest, request: Request, response: Response,
         decision=score.decision,
         model_version=score.model_version,
         trace_id=request.state.trace_id,
+        reasons=[ReasonOut(field=r.field, effect=r.effect) for r in reasons],
     )
 
 
