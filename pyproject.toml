@@ -30,6 +30,7 @@ markers = [
     "unit: fast, no I/O",
     "integration: app-level, through TestClient",
     "behavioural: exercises the real model artefact",
+    "data: checks the data files themselves (reads data/, never writes it)",
     "slow: excluded from the per-commit gate",
 ]
 
