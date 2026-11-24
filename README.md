@@ -218,7 +218,7 @@ corpus from shrinking.
 | `test` | PR, main | The fast suite with branch coverage of 80% or more; coverage report uploaded |
 | `image-smoke` | PR, main (after lint and test) | The image builds under the 600 MB budget and serves predictions. Also checks the headers and the 422 envelope, the non-root user, no curl or pip in the image, a `healthy` healthcheck and the compose stack |
 | `image-scan` | PR, main (after lint and test) | Trivy finds no fixable HIGH or CRITICAL vulnerability; full report and CycloneDX SBOM uploaded |
-| `publish` | main only | Pushes `ghcr.io/aaturki/fraud-service:<commit-sha>` and `:main`; never `latest` alone |
+| `publish` | main only | Pushes `ghcr.io/aaturki/fraud-service:<commit-sha>` and `:main`, never `latest` alone, with a signed build provenance attestation for the digest |
 | `nightly` | every night | The full suite, including the golden file |
 | `benchmarks` | by hand, Dockerfile changes | The container numbers in [BENCHMARKS.md](BENCHMARKS.md) |
 
@@ -245,6 +245,13 @@ and the pull request was merged.
 
 Every action is pinned to a full commit SHA and both base images to a digest. Dependabot
 proposes the updates, which go through the same gates.
+
+Every image published from `main` also carries a signed build provenance attestation: which
+repository, workflow and commit built that exact digest. It is signed with the workflow's
+short-lived OIDC identity, so there is no signing key to store, leak or rotate. Check an
+image before you run it:
+
+    gh attestation verify oci://ghcr.io/aaturki/fraud-service:<commit-sha> --owner aaturki
 
 ## Benchmarks, decisions, history
 

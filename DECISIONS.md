@@ -79,6 +79,13 @@ update, because the fix existed and the ignore file is reserved for documented, 
 exceptions. The image also dropped `curl` and `pip`: the healthcheck uses Python's
 `urllib`, so there are fewer binaries to patch and the image is 184 MB.
 
+Pinning protects what goes into the image; a signed provenance attestation protects what comes
+out. Every image pushed from `main` carries one, bound to its digest and signed with the
+workflow's short-lived OIDC identity. I weighed signing with a stored key (cosign with a key
+pair), but a stored key is one more secret to protect and rotate, the opposite of what this
+project argues for. Anyone can now check, before running an image, that this repository's
+pipeline built that exact digest from a given commit.
+
 ## 7. Metrics without a new dependency, accepting per-worker numbers
 
 `/metrics` renders the Prometheus text format from a small thread-safe registry
