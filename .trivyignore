@@ -1,0 +1,14 @@
+# Reviewed ignore file for the image scan gate (ci.yml, job image-scan).
+#
+# The gate fails a pull request on any HIGH or CRITICAL vulnerability that has a fix.
+# An entry here is a decision, not a shortcut. Each one needs, on the line above it:
+#   - why it does not apply to this service, or why it cannot be fixed yet,
+#   - who reviewed it, and the date by which it must be looked at again.
+# Remove the entry as soon as a fixed base image or package is available.
+#
+# Format: one vulnerability id per line, for example
+#   # libfoo in the base image; not reachable: the service never parses foo files.
+#   # Reviewed by <name> 2026-11-24, revisit by 2026-12-24.
+#   CVE-2026-00000
+#
+# Current entries: none.
