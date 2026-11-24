@@ -30,6 +30,13 @@ def test_caller_trace_id_is_propagated(client_factory):
 
 
 @pytest.mark.integration
+def test_malformed_corpus_never_shrinks():
+    """40 from the workshop plus 6 from contract 1.1 (CHANGELOG.md). Deleting a payload is
+    as much a weakened check as deleting a test."""
+    assert len(MALFORMED) >= 46
+
+
+@pytest.mark.integration
 @pytest.mark.parametrize("payload_file", MALFORMED, ids=lambda p: p.stem)
 def test_malformed_corpus_rejected(client_factory, payload_file):
     """Every crafted bad payload must die at the validation wall."""
