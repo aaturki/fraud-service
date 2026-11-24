@@ -3,6 +3,23 @@
 All notable changes to the service contract and its behaviour. Versions follow
 [Semantic Versioning](https://semver.org/); the API path stays `/v1`.
 
+## 1.2.0: the reasons behind every alert
+
+Additive: callers keep working, and `/v1/predict` answers with one more field. For a review
+or a block, `reasons` lists up to three request fields that pushed the score up, strongest
+first. Each has an `effect`: how much lower the probability is when that field takes the
+value of a typical training transaction (149.24 SAR, `pos`, `ELECTRONICS`, 12:00 UTC). The
+list is empty for allow, which costs no extra model call. A reason names a field, never its
+value, and identifiers are never reasons. Measured with the real model:
+
+    9,500 SAR transfer at 02:10 UTC      -> 0.879, block
+      reasons: amount_sar 0.352, channel 0.102, timestamp 0.062
+    7,800 SAR ecom purchase at 14:20 UTC -> 0.881, block
+      reasons: amount_sar 0.565, channel 0.387
+
+Every one of the 108 alerts in the labelled sample has a reason, and making its top reason
+typical lowers the score by 0.115 to 0.665. The batch endpoint does not carry reasons yet.
+
 ## 1.1.1: one instant, one score
 
 A fix: callers send exactly what they sent before. Version 1.1.0 promised that any offset is
