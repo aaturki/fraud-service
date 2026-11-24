@@ -20,7 +20,7 @@ class AmountModel(ConstantModel):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("p, expected", [
+@pytest.mark.parametrize(("p", "expected"), [
     (0.99, Decision.BLOCK), (0.75, Decision.REVIEW), (0.10, Decision.ALLOW)])
 def test_scorer_applies_policy_and_carries_version(sample_txn, p, expected):
     scorer = FraudScorer(model=ConstantModel(p, version="test-9"), block_threshold=0.85)

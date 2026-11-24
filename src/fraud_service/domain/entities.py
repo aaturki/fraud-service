@@ -10,6 +10,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator
 
+NIGHT_ENDS_AT_HOUR = 6    # hours 0 to 5 UTC count as night, as in the training code
+
 
 class Channel(StrEnum):
     POS = "pos"
@@ -59,7 +61,7 @@ class Transaction(BaseModel):
             "channel": self.channel.value,
             "mcc": self.merchant_category,
             "hour_of_day": self.timestamp.hour,
-            "is_night": int(self.timestamp.hour < 6),
+            "is_night": int(self.timestamp.hour < NIGHT_ENDS_AT_HOUR),
         })
 
 

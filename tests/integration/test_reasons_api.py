@@ -50,7 +50,8 @@ def test_reasons_name_fields_never_values(client):
     body = client.post("/v1/predict", json={**SAMPLE, "amount_sar": 5_000.0}).json()
     assert {r["field"] for r in body["reasons"]} <= set(EXPLAINED_FIELDS)
     text = json.dumps(body["reasons"])
-    assert SAMPLE["customer_id"] not in text and "5000" not in text
+    assert SAMPLE["customer_id"] not in text
+    assert "5000" not in text
 
 
 def test_an_allowed_transaction_has_no_reasons(client):

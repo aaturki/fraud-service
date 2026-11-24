@@ -39,7 +39,7 @@ def test_invariance_to_how_the_time_is_written(real_model, make_txn):
     assert riyadh == pytest.approx(utc, abs=1e-9)
 
 
-@pytest.mark.parametrize("small, large", [(50.0, 50_000.0), (5.0, 500.0), (900.0, 90_000.0)])
+@pytest.mark.parametrize(("small", "large"), [(50.0, 50_000.0), (5.0, 500.0), (900.0, 90_000.0)])
 def test_directional_amount(real_model, make_txn, small, large):
     """All else equal, a much larger amount must not LOWER fraud probability."""
     assert _score(real_model, make_txn(amount_sar=large)) >= \

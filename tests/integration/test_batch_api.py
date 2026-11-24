@@ -56,7 +56,7 @@ def test_rejections_never_echo_values(client_factory):
     assert "987654" not in r.text
 
 
-@pytest.mark.parametrize("count, status", [(0, 422), (1, 200), (MAX_BATCH_ITEMS, 200),
+@pytest.mark.parametrize(("count", "status"), [(0, 422), (1, 200), (MAX_BATCH_ITEMS, 200),
                                            (MAX_BATCH_ITEMS + 1, 422)])
 def test_batch_size_limits(client_factory, count, status):
     r = client_factory().post(URL, json={"items": [_txn(i) for i in range(count)]})

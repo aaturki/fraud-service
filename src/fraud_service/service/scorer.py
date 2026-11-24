@@ -37,8 +37,8 @@ class FraudScorer:
             return []
         variants = typical_variants(txn)
         raws = self.model.predict_proba_many([v.to_features() for v in variants.values()])
-        return strongest_reasons(
-            score.probability, {field: raw.value for field, raw in zip(variants, raws, strict=True)})
+        typical_scores = {field: raw.value for field, raw in zip(variants, raws, strict=True)}
+        return strongest_reasons(score.probability, typical_scores)
 
     def _to_score(self, txn: Transaction, raw: RawScore) -> FraudScore:
         return FraudScore(

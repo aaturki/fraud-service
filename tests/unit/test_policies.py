@@ -5,7 +5,7 @@ from fraud_service.domain.policies import decide
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("p, expected", [
+@pytest.mark.parametrize(("p", "expected"), [
     (0.849999, Decision.REVIEW),   # just under block => review band
     (0.85,     Decision.BLOCK),    # boundary is inclusive: documented rule
     (0.699999, Decision.ALLOW),    # just under the review band

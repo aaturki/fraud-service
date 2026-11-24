@@ -41,7 +41,7 @@ def ready_client() -> TestClient:
     return TestClient(app, raise_server_exceptions=False)
 
 
-@pytest.mark.parametrize("method, path, body, status", [
+@pytest.mark.parametrize(("method", "path", "body", "status"), [
     ("POST", "/v1/predict", SAMPLE, 200),
     ("POST", "/v1/predict", {**SAMPLE, "amount_sar": "lots"}, 422),
     ("GET", "/v1/health", None, 200),
@@ -58,7 +58,7 @@ def test_every_response_names_its_trace_and_model(ready_client, method, path, bo
         assert r.json()["error"]["trace_id"] == r.headers["X-Trace-Id"]
 
 
-@pytest.mark.parametrize("status, code", [(404, "NOT_FOUND"), (405, "METHOD_NOT_ALLOWED")])
+@pytest.mark.parametrize(("status", "code"), [(404, "NOT_FOUND"), (405, "METHOD_NOT_ALLOWED")])
 def test_routing_errors_have_stable_codes(ready_client, status, code):
     path, method = ("/v1/nope", "GET") if status == 404 else ("/v1/predict", "GET")
     r = ready_client.request(method, path)

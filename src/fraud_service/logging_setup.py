@@ -10,8 +10,10 @@ SENSITIVE_KEYS = {"password", "token", "secret", "authorization",
                   "registry_token", "national_id", "card_number"}
 
 
-def _mask_sensitive(logger: WrappedLogger, method: str, event_dict: EventDict) -> EventDict:
-    """Defensive masking: even if someone logs a secret, it leaves masked."""
+def _mask_sensitive(_logger: WrappedLogger, _method_name: str,
+                    event_dict: EventDict) -> EventDict:
+    """Defensive masking: even if someone logs a secret, it leaves masked. structlog passes
+    the logger and the method name positionally; only the event matters here."""
     for key in list(event_dict):
         if key.lower() in SENSITIVE_KEYS:
             event_dict[key] = "***MASKED***"
