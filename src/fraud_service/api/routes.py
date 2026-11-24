@@ -54,6 +54,7 @@ def predict(body: PredictRequest, request: Request, response: Response,
              model_version=score.model_version,
              latency_ms=round((time.perf_counter() - t0) * 1000, 1))
     # ABSENT by design: customer_id, amount, raw feature values
+    request.app.state.metrics.count_decisions([score.decision.value])
     response.headers["X-Model-Version"] = score.model_version
     response.headers["Cache-Control"] = "no-store"     # a risk decision is never reusable
     return PredictResponse(
@@ -98,6 +99,7 @@ def predict_batch(body: BatchRequest, request: Request, response: Response,
              model_version=version,
              latency_ms=round((time.perf_counter() - t0) * 1000, 1))
     # ABSENT by design, as for single predictions: identifiers, amounts, raw probabilities
+    request.app.state.metrics.count_decisions(score.decision.value for score in scores)
     response.headers["X-Model-Version"] = version
     response.headers["Cache-Control"] = "no-store"
     return BatchResponse(
