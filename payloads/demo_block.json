@@ -1,0 +1,8 @@
+{
+ "transaction_id": "TXN-2026-00999",
+ "amount_sar": 9500,
+ "channel": "transfer",
+ "merchant_category": "electronics",
+ "customer_id": "CUST-00077",
+ "timestamp": "2026-07-05T02:10:00+00:00"
+}
