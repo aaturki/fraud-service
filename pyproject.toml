@@ -69,6 +69,7 @@ ignore_missing_imports = true      # joblib and scikit-learn ship no type stubs
 
 [tool.importlinter]
 root_package = "fraud_service"
+include_external_packages = true   # so contracts can name third-party packages
 
 [[tool.importlinter.contracts]]
 name = "Clean architecture layers"
@@ -80,3 +81,15 @@ layers = [
     "fraud_service.domain",
 ]
 
+[[tool.importlinter.contracts]]
+name = "Only the adapter imports the ML stack"
+type = "forbidden"
+source_modules = ["fraud_service.domain", "fraud_service.service", "fraud_service.api"]
+forbidden_modules = ["sklearn", "joblib", "pandas", "numpy"]
+allow_indirect_imports = true      # api reaches the adapter only in the composition root
+
+[[tool.importlinter.contracts]]
+name = "The core knows no web framework, server or logging library"
+type = "forbidden"
+source_modules = ["fraud_service.domain", "fraud_service.service"]
+forbidden_modules = ["fastapi", "starlette", "uvicorn", "structlog"]
