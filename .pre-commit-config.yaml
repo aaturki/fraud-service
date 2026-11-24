@@ -1,0 +1,33 @@
+# Checks that run on your machine before each commit, so a secret or a broken file is caught
+# before it exists anywhere else. Set up once per clone:
+#
+#     pip install -e ".[dev]"      # includes pre-commit
+#     pre-commit install
+#
+# CI runs the same hooks (the pre-commit job), so a skipped or broken hook cannot hide.
+# Every hook is pinned to a full commit SHA, like the actions in .github/workflows;
+# `pre-commit autoupdate --freeze` moves the pins.
+exclude: ^(labs|legacy)/          # workshop material, kept exactly as it was handed out
+
+repos:
+  # The same gitleaks release that the secrets job in CI runs over the whole history.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e  # frozen: v8.30.1
+    hooks:
+      - id: gitleaks                # scans only what you are about to commit
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: detect-private-key
+      - id: check-added-large-files # a new file over 500 KB (a dataset, a model) is a decision
+        args: ["--maxkb=500"]
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 9026c9127e153371d7a78dfcb0c45ae2046a3d10  # frozen: v0.17.6
+    hooks:
+      - id: ruff-check
+        files: ^(src|tests)/        # the same scope as the lint job
