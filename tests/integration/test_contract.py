@@ -100,6 +100,19 @@ def test_ready_reports_the_model_it_serves(ready_client):
     assert body["model_version"] == "test-9"
 
 
+def test_every_request_log_line_names_trace_and_model(ready_client, capsys):
+    from fraud_service.logging_setup import configure_logging
+
+    configure_logging("INFO")
+    ready_client.post("/v1/predict", json=SAMPLE, headers={"X-Trace-Id": "log-check-1"})
+    lines = [json.loads(line) for line in capsys.readouterr().out.splitlines()
+             if line.startswith("{")]
+    mine = [line for line in lines if line.get("trace_id") == "log-check-1"]
+    assert {line["event"] for line in mine} >= {"prediction_served", "http_request"}
+    assert all(line["model_version"] == "test-9" for line in mine)
+    assert not any("customer_id" in line or "amount_sar" in line for line in mine)
+
+
 def test_openapi_documents_the_error_envelope(ready_client):
     spec = ready_client.get("/openapi.json").json()
     responses = spec["paths"]["/v1/predict"]["post"]["responses"]

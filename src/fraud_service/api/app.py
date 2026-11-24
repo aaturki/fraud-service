@@ -76,7 +76,10 @@ def create_app() -> FastAPI:
         trace_id = _incoming_trace_id(request)
         request.state.trace_id = trace_id
         structlog.contextvars.clear_contextvars()
-        structlog.contextvars.bind_contextvars(trace_id=trace_id)   # on every log line
+        # On every log line of this request: which request, and which model answered it.
+        structlog.contextvars.bind_contextvars(
+            trace_id=trace_id,
+            model_version=getattr(request.app.state, "model_version", None) or "not-loaded")
         t0 = time.perf_counter()
         if _declared_length(request) > MAX_BODY_BYTES:
             response: Response = _error(request, 413, "PAYLOAD_TOO_LARGE",
