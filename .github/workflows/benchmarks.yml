@@ -1,0 +1,35 @@
+name: benchmarks
+
+# Container numbers for BENCHMARKS.md, measured on the runner that builds the image.
+# Runs by hand, and on pull requests that change what the numbers depend on.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - Dockerfile
+      - requirements.lock
+      - scripts/bench_container.sh
+      - .github/workflows/benchmarks.yml
+
+permissions:
+  contents: read
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Load-test client only (the service itself runs in the container)
+        run: pip install httpx==0.28.1
+      - name: Measure
+        run: bash scripts/bench_container.sh | tee bench.md
+      - name: Publish the numbers on the run page
+        run: cat bench.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: benchmarks
+          path: bench.md
