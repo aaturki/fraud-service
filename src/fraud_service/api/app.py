@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Raqib fraud-scoring service", version="1.0.0", lifespan=lifespan,
+    app = FastAPI(title="Raqib fraud-scoring service", version="1.1.0", lifespan=lifespan,
                   description="Scores one card transaction for fraud risk and answers "
                               "allow, review or block. SDA-AIE-113, SDAIA Academy.")
     app.include_router(router, prefix="/v1")

@@ -1,8 +1,13 @@
 """Wire contract. These models exist for consumers; keep them stable.
-They convert to/from domain entities in routes and never leak inward."""
+They convert to/from domain entities in routes and never leak inward.
+
+Contract v1.1 (the stricter firewall, see CHANGELOG.md): an amount is a JSON number, never
+a string or a boolean, and a timestamp is ISO 8601 text with an explicit UTC offset.
+"""
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
+from pydantic_core import PydanticCustomError
 
 from fraud_service.domain.entities import Channel, Decision, Transaction
 
@@ -11,11 +16,32 @@ class PredictRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")   # reject unknown fields loudly
 
     transaction_id: str = Field(min_length=8, max_length=64, examples=["TXN-2026-00042"])
-    amount_sar: float = Field(gt=0, le=1_000_000, description="Transaction amount in SAR")
+    # strict: "249.99" and true are refused instead of being coerced to a number
+    amount_sar: float = Field(gt=0, le=1_000_000, strict=True, examples=[249.99],
+                              description="Transaction amount in SAR, as a JSON number")
     channel: Channel
     merchant_category: str = Field(min_length=2, max_length=40, examples=["electronics"])
     customer_id: str = Field(min_length=4, max_length=64, examples=["CUST-00077"])
-    timestamp: datetime
+    timestamp: AwareDatetime = Field(examples=["2026-07-05T03:30:00+00:00"],
+                                     description="ISO 8601 with an explicit UTC offset")
+
+    @field_validator("timestamp", mode="before")
+    @classmethod
+    def timestamp_must_be_text(cls, v: object) -> object:
+        # Lax parsing would turn 1783222200 into a date. A number is ambiguous (seconds or
+        # milliseconds?), so the contract asks for ISO 8601 text only. A PydanticCustomError,
+        # not a TypeError: pydantic turns it into a 422, a TypeError would become a 500.
+        if not isinstance(v, str):
+            raise PydanticCustomError("timestamp_type",
+                                      "timestamp must be ISO 8601 text with a UTC offset")
+        return v
+
+    @field_validator("merchant_category")
+    @classmethod
+    def category_must_not_be_blank(cls, v: str) -> str:
+        if len(v.strip()) < 2:
+            raise ValueError("merchant_category must contain at least 2 visible characters")
+        return v
 
     def to_domain(self) -> Transaction:
         return Transaction(**self.model_dump())
