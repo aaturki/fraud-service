@@ -11,7 +11,7 @@ def test_feature_names_are_stable(sample_txn):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("hour, expected", [(0, 1), (5, 1), (6, 0), (15, 0), (23, 0)])
+@pytest.mark.parametrize(("hour", "expected"), [(0, 1), (5, 1), (6, 0), (15, 0), (23, 0)])
 def test_night_flag_boundaries(make_txn, sample_txn, hour, expected):
     txn = make_txn(timestamp=sample_txn.timestamp.replace(hour=hour))
     assert txn.to_features().values["is_night"] == expected

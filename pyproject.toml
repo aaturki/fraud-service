@@ -46,6 +46,21 @@ exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
 line-length = 100
 src = ["src", "tests"]
 
+[tool.ruff.lint]
+# 18 rule families: style and errors (E, W, F), imports (I), likely bugs (B), security (S),
+# simplifications (SIM, C4, PIE, RET, PERF), naming (N), modern syntax (UP), pytest style
+# (PT), pylint (PL), exception hygiene (TRY), unused arguments (ARG) and ruff's own (RUF).
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "C4", "PT", "RUF", "N", "S", "PL", "TRY",
+          "RET", "ARG", "PIE", "PERF"]
+# pydantic reports a validator's failure through the exception's own message, so a message
+# written at the raise is the point there, not a smell.
+ignore = ["TRY003"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, compare with literal values, run the scripts they test, import inside a test
+# on purpose, and accept fixtures or fake-model arguments they do not always use.
+"tests/**" = ["S101", "PLR2004", "S603", "PLC0415", "ARG"]
+
 [tool.mypy]
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
@@ -63,3 +78,4 @@ layers = [
     "fraud_service.service",
     "fraud_service.domain",
 ]
+

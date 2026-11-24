@@ -56,7 +56,8 @@ def test_unknown_paths_share_one_series(client_factory):
         client.get(path)
     text = client.get("/metrics").text
     assert _value(text, 'http_requests_total{method="GET",route="unmatched",status="404"}') == 4
-    assert "/wp-admin" not in text and "/.env" not in text
+    assert "/wp-admin" not in text
+    assert "/.env" not in text
 
 
 def test_path_parameters_never_become_label_values():

@@ -14,6 +14,8 @@ from pydantic_core import PydanticCustomError
 
 from fraud_service.domain.entities import Channel, Decision, Transaction
 
+MIN_VISIBLE_CHARS = 2     # a merchant category needs at least this many non-blank characters
+
 
 class PredictRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")   # reject unknown fields loudly
@@ -42,8 +44,9 @@ class PredictRequest(BaseModel):
     @field_validator("merchant_category")
     @classmethod
     def category_must_not_be_blank(cls, v: str) -> str:
-        if len(v.strip()) < 2:
-            raise ValueError("merchant_category must contain at least 2 visible characters")
+        if len(v.strip()) < MIN_VISIBLE_CHARS:
+            raise ValueError(f"merchant_category must contain at least {MIN_VISIBLE_CHARS} "
+                             "visible characters")
         return v
 
     def to_domain(self) -> Transaction:
