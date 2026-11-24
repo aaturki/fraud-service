@@ -9,10 +9,12 @@ from datetime import UTC, datetime
 import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from fraud_service.adapters.sklearn_model import SklearnModel
+from fraud_service.api.metrics import CONTENT_TYPE as METRICS_CONTENT_TYPE
+from fraud_service.api.metrics import Metrics
 from fraud_service.api.routes import router
 from fraud_service.api.schemas import problems
 from fraud_service.config import Settings
@@ -59,6 +61,14 @@ def create_app() -> FastAPI:
                   description="Scores one card transaction for fraud risk and answers "
                               "allow, review or block. SDA-AIE-113, SDAIA Academy.")
     app.include_router(router, prefix="/v1")
+    app.state.metrics = Metrics()
+
+    @app.get("/metrics", response_class=PlainTextResponse, tags=["operations"])
+    def metrics(request: Request) -> PlainTextResponse:
+        """Prometheus scrape target: request counter, latency histogram, decisions, model."""
+        text = request.app.state.metrics.render(getattr(request.app.state, "model_version", None))
+        return PlainTextResponse(text, media_type=METRICS_CONTENT_TYPE,
+                                 headers={"Cache-Control": "no-store"})
 
     @app.middleware("http")
     async def trace_and_log(request: Request,
@@ -79,12 +89,14 @@ def create_app() -> FastAPI:
                 # the failed requests are not the ones missing from the log.
                 log.warning("http_request", method=request.method, path=request.url.path,
                             status=500, latency_ms=_ms_since(t0))
+                _observe(request, 500, t0)
                 raise
         latency_ms = _ms_since(t0)
         _stamp(request, response)
         response.headers["X-Response-Time-Ms"] = str(latency_ms)
         log.info("http_request", method=request.method, path=request.url.path,
                  status=response.status_code, latency_ms=latency_ms)
+        _observe(request, response.status_code, t0)
         return response
 
     @app.exception_handler(RequestValidationError)
@@ -124,6 +136,24 @@ def _declared_length(request: Request) -> int:
 
 def _ms_since(t0: float) -> float:
     return round((time.perf_counter() - t0) * 1000, 1)
+
+
+def _route_label(request: Request) -> str:
+    """A bounded label: the matched route, or "unmatched" for anything that matched none."""
+    route = request.scope.get("route")
+    if route is None:
+        return "unmatched"
+    if getattr(route, "param_convertors", None):
+        return str(route.path)        # keep the template: ids must never become label values
+    return str(request.scope["path"])   # no path parameters: the path is the template
+
+
+def _observe(request: Request, status: int, t0: float) -> None:
+    """Metrics by route; scrapes of /metrics do not count themselves."""
+    route = _route_label(request)
+    if route != "/metrics":
+        request.app.state.metrics.observe_request(request.method, route, status,
+                                                  time.perf_counter() - t0)
 
 
 def _trace_id(request: Request) -> str:
