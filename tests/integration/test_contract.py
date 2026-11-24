@@ -25,6 +25,9 @@ class FixedModel:
     def predict_proba(self, features: FeatureVector) -> RawScore:
         return RawScore(value=self._p)
 
+    def predict_proba_many(self, features: list[FeatureVector]) -> list[RawScore]:
+        return [RawScore(value=self._p) for _ in features]
+
 
 @pytest.fixture
 def ready_client() -> TestClient:

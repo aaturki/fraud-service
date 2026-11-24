@@ -3,6 +3,7 @@
 If we move to ONNX or a remote model server, we add a sibling
 adapter and change one line in the composition root.
 """
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -28,3 +29,8 @@ class SklearnModel:
         frame = pd.DataFrame([features.values])
         proba = float(self._pipeline.predict_proba(frame)[0, 1])
         return RawScore(value=proba)
+
+    def predict_proba_many(self, features: Sequence[FeatureVector]) -> list[RawScore]:
+        # One DataFrame, one pipeline call: the per-call overhead is paid once per batch.
+        frame = pd.DataFrame([f.values for f in features])
+        return [RawScore(value=float(p)) for p in self._pipeline.predict_proba(frame)[:, 1]]

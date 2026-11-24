@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from fraud_service.adapters.sklearn_model import SklearnModel
 from fraud_service.api.routes import router
+from fraud_service.api.schemas import problems
 from fraud_service.config import Settings
 from fraud_service.domain.entities import Channel, FeatureVector, Transaction
 from fraud_service.logging_setup import configure_logging, get_logger
@@ -89,8 +90,7 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
         # Field names and problems only: never echo the offending values back.
-        details = [{"field": ".".join(str(part) for part in err["loc"][1:]) or "body",
-                    "problem": err["msg"]} for err in exc.errors()]
+        details = [d.model_dump() for d in problems(exc.errors(), prefix_parts=1, root="body")]
         log.warning("validation_rejected", fields=sorted({d["field"] for d in details}))
         return _error(request, 422, "INVALID_REQUEST", "Request body failed validation",
                       details=details)

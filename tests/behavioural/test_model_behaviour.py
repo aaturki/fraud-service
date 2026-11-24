@@ -32,6 +32,16 @@ def test_directional_amount(real_model, make_txn, small, large):
         _score(real_model, make_txn(amount_sar=small)) - 1e-6
 
 
+def test_batch_scoring_equals_one_by_one(real_model, make_txn):
+    """The batch fast path must be an optimisation, never a different model."""
+    txns = [make_txn(amount_sar=a, channel=c, merchant_category=m)
+            for a, c, m in [(12.5, "pos", "grocery"), (49_000.0, "transfer", "jewellery"),
+                            (310.0, "ecom", "electronics"), (75.0, "atm", "cash")]]
+    batch = [s.value for s in real_model.predict_proba_many([t.to_features() for t in txns])]
+    single = [_score(real_model, t) for t in txns]
+    assert batch == pytest.approx(single, abs=1e-12)
+
+
 @pytest.mark.slow
 def test_golden_scores(real_model):
     """The skew tripwire: every reference row must reproduce (within tolerance)."""
