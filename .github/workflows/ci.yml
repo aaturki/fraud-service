@@ -15,12 +15,18 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.12"
+  TRIVY_VERSION: v0.76.2        # an immutable release, published after the March 2026 incident
+
+# Every action is pinned to a full commit SHA, with the release in a comment. In March 2026
+# attackers moved 76 of 77 version tags of aquasecurity/trivy-action onto malicious commits:
+# a tag is a movable pointer, a SHA is not. Dependabot proposes the updates.
 
 jobs:
   secrets:                      # a scanner on every change: the last step of INCIDENT.md
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0        # the whole history: a deleted secret is still a leaked secret
       - name: Gitleaks over the full history (image pinned by digest)
@@ -31,9 +37,10 @@ jobs:
 
   lint:                         # cheapest gate first: seconds, not minutes
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -48,9 +55,10 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -60,26 +68,35 @@ jobs:
         run: pytest -m "not slow" --cov --cov-report=term-missing --cov-report=html --cov-fail-under=80
       - name: Upload coverage report
         if: always()            # evidence even on failure
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage
           path: htmlcov/
 
-  image-smoke:                  # build once, prove the ARTEFACT works
+  image-smoke:                  # build once, prove the ARTEFACT works, alone and in the stack
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [lint, test]
     steps:
-      - uses: actions/checkout@v6
-      - uses: docker/setup-buildx-action@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build (GitHub Actions layer cache)
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          load: true                          # keep the image local for the smoke test
-          tags: fraud-service:ci
+          load: true                          # keep the image local for the smoke tests
+          tags: |
+            fraud-service:ci
+            fraud-service:dev
           build-args: GIT_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Size budget (rubric limit 600 MB)
+        run: |
+          bytes=$(docker image inspect fraud-service:ci --format '{{.Size}}')
+          mb=$((bytes / 1000 / 1000))
+          echo "Image size: ${mb} MB" | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$mb" -lt 600
       - name: Smoke test the container
         run: |
           docker run -d --name svc -p 8000:8000 fraud-service:ci
@@ -89,30 +106,113 @@ jobs:
             sleep 2
           done
           if [ "$ready" != "1" ]; then docker logs svc; exit 1; fi
-          curl -fsS localhost:8000/v1/predict \
+          curl -fsS -D headers.txt localhost:8000/v1/predict \
                -H "content-type: application/json" -d @payloads/sample.json \
             | python -c "import json,sys; b=json.load(sys.stdin); assert 0 <= b['fraud_probability'] <= 1; assert b['model_version']; print('smoke OK:', b['decision'])"
+          grep -qi '^x-model-version: ' headers.txt
+          grep -qi '^x-trace-id: ' headers.txt
+          code=$(curl -s -o bad.json -w '%{http_code}' localhost:8000/v1/predict \
+                 -H "content-type: application/json" -d @payloads/malformed/amount_text.json)
+          test "$code" = "422" && grep -q '"INVALID_REQUEST"' bad.json
           test "$(docker exec svc whoami)" = "appuser"
+          docker exec svc sh -c '! command -v curl && ! command -v pip'   # nothing extra shipped
+      - name: Container healthcheck reports healthy
+        run: |
+          for i in $(seq 1 20); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' svc)
+            if [ "$status" = "healthy" ]; then echo "healthy after ~$((i * 3)) s"; exit 0; fi
+            sleep 3
+          done
+          docker inspect --format '{{json .State.Health}}' svc; exit 1
+      - name: Compose stack comes up healthy (API gated on Redis)
+        run: |
+          docker rm -f svc
+          docker compose up --no-build -d --wait --wait-timeout 120
+          docker compose ps
+          curl -fsS localhost:8000/v1/predict -H "content-type: application/json" \
+               -d @payloads/sample.json
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose logs --no-color || true
+      - name: Tear down
+        if: always()
+        run: docker compose down -v || true
+
+  image-scan:                   # the image scan gate: HIGH/CRITICAL with a fix fails the PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build (from the layer cache)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: fraud-service:scan
+          build-args: GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+      - name: Trivy vulnerability gate (action pinned by SHA, Trivy by version)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          image-ref: fraud-service:scan
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true        # gate on what we can fix; unfixed ones are listed below
+          trivyignores: .trivyignore  # every entry is reviewed and dated
+          exit-code: "1"
+          format: table
+      - name: Full report, every severity (evidence, never fails)
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          image-ref: fraud-service:scan
+          scanners: vuln
+          format: table
+          output: trivy-report.txt
+          exit-code: "0"
+      - name: SBOM (CycloneDX)
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          image-ref: fraud-service:scan
+          format: cyclonedx
+          output: sbom.cdx.json
+          exit-code: "0"
+      - name: Upload scan report and SBOM
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-scan
+          path: |
+            trivy-report.txt
+            sbom.cdx.json
 
   publish:                      # delivery: only on main, never on PRs
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [image-smoke]
+    needs: [secrets, image-smoke, image-scan]
     permissions:
       contents: read
       packages: write           # scoped token for the GHCR push
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Image name must be lowercase
         run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push (commit-SHA tag + branch tag)
-        uses: docker/build-push-action@v7
+      - name: Build and push (commit-SHA tag + branch tag, never latest alone)
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: true
@@ -121,3 +221,12 @@ jobs:
             ${{ env.IMAGE }}:${{ github.sha }}
             ${{ env.IMAGE }}:main
           cache-from: type=gha
+      - name: Record what was published
+        run: |
+          {
+            echo "Published \`${IMAGE}:${GITHUB_SHA}\` and \`${IMAGE}:main\`"
+            echo ""
+            echo "Digest: \`${{ steps.push.outputs.digest }}\`"
+            echo ""
+            echo "Pull it: \`docker pull ${IMAGE}:${GITHUB_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
