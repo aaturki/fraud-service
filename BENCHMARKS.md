@@ -90,10 +90,14 @@ What it shows:
 
 | Measurement | Result |
 |---|---|
-| Fast suite, `pytest -m "not slow" --cov` | 145 tests in 9 s, 100% branch coverage |
-| Full suite, including the golden file | 148 tests in 34 s |
+| Fast suite, `pytest -m "not slow" --cov` | 164 tests in 7.4 s, 100% branch coverage |
+| Full suite, including the golden file | 167 tests in 33 s |
 | Golden file alone (5,000 rows, `test_golden_scores`) | 8.6 s; largest difference 5e-10 |
 | Malformed corpus | 46 of 46 payloads rejected with 422 |
+
+Re-measured on commit `c5438ba`, after the data checks (#12) and the UTC fix (#14) added 19
+tests. Earlier the same day the suites held 145 and 148 tests (9 s and 34 s). The fast suite
+still runs in under 10 s.
 
 ## Lab 5: the pipeline (CI runner)
 
